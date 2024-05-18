@@ -1,0 +1,64 @@
+
+import cv2
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+# Read the landscape image
+image_path = '/LULC_2005_15_vik/0506_vik.tif'
+image = cv2.imread(image_path)
+
+# Check if the image is loaded successfully
+if image is None:
+print(f"Error: Unable to read the image from {image_path}")
+else:
+# Convert the image to a 2D array of RGB values
+height, width, channels = image.shape
+image_2d = image.reshape((height * width, channels))
+
+# Use K-Means clustering to identify hotspots
+num_clusters = 5  # You can adjust this based on the characteristics of your data
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+kmeans.fit(image_2d)
+
+# Assign each pixel to a cluster
+labels = kmeans.labels_
+hotspot_label = np.argmax(np.bincount(labels))
+
+# Highlight hotspots in the original image
+hotspot_mask = (labels == hotspot_label).reshape((height, width)).astype(np.uint8)
+hotspot_highlight = image.copy()
+hotspot_highlight[hotspot_mask == 0] = [0, 0, 0]  # Set non-hotspot areas to black
+
+# Display the original and highlighted images
+cv2.imshow('Original Image', image)
+cv2.imshow('Hotspot Highlight', hotspot_highlight)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+# Detect anomalies (areas that deviate from the cluster)
+hotspot_centroid = kmeans.cluster_centers_[hotspot_label]
+
+# Calculate distances from each pixel to the hotspot cluster centroid
+distances = np.linalg.norm(image_2d - hotspot_centroid, axis=1)
+
+# Normalize distances using StandardScaler
+scaler = StandardScaler()
+distances_scaled = scaler.fit_transform(distances.reshape(-1, 1))
+
+# Define a threshold for anomaly detection (adjust as needed)
+anomaly_threshold = 3.0
+
+# Identify anomalies
+anomalies = distances_scaled > anomaly_threshold
+
+# Highlight anomalies in the original image
+anomaly_mask = anomalies.reshape((height, width)).astype(np.uint8)
+anomaly_highlight = image.copy()
+anomaly_highlight[anomaly_mask == 1] = [0, 0, 255]  # Set anomaly areas to red
+
+# Display the anomaly-highlighted image
+cv2.imshow('Anomaly Highlight', anomaly_highlight)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
